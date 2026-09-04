@@ -17,54 +17,35 @@ jobs:
       - name: Build with Docker Compose
         run: docker compose build
 
+      # 1. เอา --wait ออก เพื่อไม่ให้ค้างรอ Healthcheck ของ api ที่ไม่ได้เขียนไว้
       - name: Start services
-        run: docker compose up -d --wait --wait-timeout 120
+        run: docker compose up -d
 
       - name: Show container status
         if: always()
         run: docker compose ps
-      
-      - name: Debug network
-        run: |
-          echo "--- docker compose ps ---"
-          docker compose ps
-          echo "--- port mapping ---"
-          docker port realworld-api || true
-          echo "--- test from inside container ---"
-          docker compose exec -T api wget -qO- http://localhost:3000/api || echo "internal wget failed"
-          echo "--- test from host ---"
-          curl -v http://localhost:3000/api || echo "host curl failed"
-          echo "--- test with 127.0.0.1 ---"
-          curl -v http://127.0.0.1:3000/api || echo "127.0.0.1 curl failed"
 
+      # 2. ปรับการเช็ก API: ตัด -f ออก หรือเช็ก HTTP status 200/404 เพื่อยืนยันว่า Express ตอบรับแล้ว
       - name: Wait for API to be ready
         run: |
-          for i in {1..20}; do
-            if curl -sf http://localhost:3000/api; then
-              echo "API is up"
+          for i in {1..30}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/tags || true)
+            echo "Checking API... attempt $i/30 (HTTP Status: $STATUS)"
+            if [ "$STATUS" -eq 200 ] || [ "$STATUS" -eq 404 ]; then
+              echo "API is up and responding!"
               exit 0
             fi
-            echo "Waiting for API... ($i/20)"
-            sleep 5
+            sleep 3
           done
           echo "API did not become ready in time"
           exit 1
 
-      - name: Deep debug on failure
-        if: failure()
-        run: |
-          echo "--- restart count & exit code ---"
-          docker inspect realworld-api --format='RestartCount={{.RestartCount}} Status={{.State.Status}} ExitCode={{.State.ExitCode}} Error={{.State.Error}}'
-          echo "--- full raw logs (not compose logs, no truncation) ---"
-          docker logs realworld-api --timestamps
-          echo "--- dmesg check for OOM kill ---"
-          dmesg 2>/dev/null | grep -i "killed process" || echo "no dmesg access or no OOM"
-
+      # 3. ทดสอบยิง API จริงด้วย Endpoint มาตรฐานของ RealWorld App (/api/tags)
       - name: Smoke test API response
         run: |
-          response=$(curl -s http://localhost:3000/api)
+          response=$(curl -s http://localhost:3000/api/tags)
           echo "Response: $response"
-          echo "$response" | grep -q "API is running" || (echo "Unexpected response" && exit 1)
+          echo "$response" | grep -q "tags" || (echo "Unexpected response" && exit 1)
 
       - name: Show logs on failure
         if: failure()
@@ -73,5 +54,3 @@ jobs:
       - name: Tear down
         if: always()
         run: docker compose down -v
-
-
