@@ -46,4 +46,4 @@ jobs:
       - name: Tear down
         if: always()
         run: docker compose down -v
-EOF
+End of file
