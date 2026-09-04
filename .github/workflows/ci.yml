@@ -23,6 +23,19 @@ jobs:
       - name: Show container status
         if: always()
         run: docker compose ps
+      
+      - name: Debug network
+        run: |
+          echo "--- docker compose ps ---"
+          docker compose ps
+          echo "--- port mapping ---"
+          docker port realworld-api || true
+          echo "--- test from inside container ---"
+          docker compose exec -T api wget -qO- http://localhost:3000/api || echo "internal wget failed"
+          echo "--- test from host ---"
+          curl -v http://localhost:3000/api || echo "host curl failed"
+          echo "--- test with 127.0.0.1 ---"
+          curl -v http://127.0.0.1:3000/api || echo "127.0.0.1 curl failed"
 
       - name: Wait for API to be ready
         run: |
