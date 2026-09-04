@@ -40,8 +40,10 @@ jobs:
           echo "$response" | grep -q "API is running" || (echo "Unexpected response" && exit 1)
 
       - name: Show logs on failure
-                                        r compose logs
+        if: failure()
+        run: docker compose logs
 
       - name: Tear down
         if: always()
         run: docker compose down -v
+EOF
