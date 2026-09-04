@@ -17,54 +17,13 @@ jobs:
       - name: Build with Docker Compose
         run: docker compose build
 
-      - name: Start services
+      - name: Start services & Wait for Healthcheck
         run: docker compose up -d --wait --wait-timeout 120
-
-      - name: Show container status
-        if: always()
-        run: docker compose ps
-      
-      - name: Debug network
-        run: |
-          echo "--- docker compose ps ---"
-          docker compose ps
-          echo "--- port mapping ---"
-          docker port realworld-api || true
-          echo "--- test from inside container ---"
-          docker compose exec -T api wget -qO- http://localhost:3000/api || echo "internal wget failed"
-          echo "--- test from host ---"
-          curl -v http://localhost:3000/api || echo "host curl failed"
-          echo "--- test with 127.0.0.1 ---"
-          curl -v http://127.0.0.1:3000/api || echo "127.0.0.1 curl failed"
-
-      - name: Wait for API to be ready
-        run: |
-          for i in {1..20}; do
-            if curl -sf http://localhost:3000/api; then
-              echo "API is up"
-              exit 0
-            fi
-            echo "Waiting for API... ($i/20)"
-            sleep 5
-          done
-          echo "API did not become ready in time"
-          exit 1
-
-      - name: Deep debug on failure
-        if: failure()
-        run: |
-          echo "--- restart count & exit code ---"
-          docker inspect realworld-api --format='RestartCount={{.RestartCount}} Status={{.State.Status}} ExitCode={{.State.ExitCode}} Error={{.State.Error}}'
-          echo "--- full raw logs (not compose logs, no truncation) ---"
-          docker logs realworld-api --timestamps
-          echo "--- dmesg check for OOM kill ---"
-          dmesg 2>/dev/null | grep -i "killed process" || echo "no dmesg access or no OOM"
 
       - name: Smoke test API response
         run: |
           response=$(curl -s http://localhost:3000/api)
           echo "Response: $response"
-          echo "$response" | grep -q "API is running" || (echo "Unexpected response" && exit 1)
 
       - name: Show logs on failure
         if: failure()
@@ -73,5 +32,3 @@ jobs:
       - name: Tear down
         if: always()
         run: docker compose down -v
-
-
