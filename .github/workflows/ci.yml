@@ -50,6 +50,16 @@ jobs:
           echo "API did not become ready in time"
           exit 1
 
+      - name: Deep debug on failure
+        if: failure()
+        run: |
+          echo "--- restart count & exit code ---"
+          docker inspect realworld-api --format='RestartCount={{.RestartCount}} Status={{.State.Status}} ExitCode={{.State.ExitCode}} Error={{.State.Error}}'
+          echo "--- full raw logs (not compose logs, no truncation) ---"
+          docker logs realworld-api --timestamps
+          echo "--- dmesg check for OOM kill ---"
+          dmesg 2>/dev/null | grep -i "killed process" || echo "no dmesg access or no OOM"
+
       - name: Smoke test API response
         run: |
           response=$(curl -s http://localhost:3000/api)
