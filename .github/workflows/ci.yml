@@ -82,7 +82,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-deploy:
+  deploy:
     needs: build-test-and-push
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
@@ -104,5 +104,5 @@ deploy:
             Downtime / Fast Swap
             docker compose up -d api
 
-          
+            # 4. ลบ Image เก่าที่ไม่ได้ใช้แล้วเพื่อคืนพื้นที่ดิสก์
             docker image prune -f
